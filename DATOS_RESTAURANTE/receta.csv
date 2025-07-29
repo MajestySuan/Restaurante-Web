@@ -1,0 +1,13 @@
+﻿id_plato;id_ingrediente;cantidad_requerida;descripcion_preparacion
+1;1;0.3;Cortar papa en rodajas
+1;4;0.5;Agregar leche
+1;9;0.1;Picar cebolla
+2;2;0.2;Asar carne
+2;10;5;Sazonar con sal
+3;3;0.4;Agregar arroz
+4;7;0.25;Cortar pescado
+5;3;0.3;Cocinar arroz
+6;7;0.25;Cortar pescado
+6;4;0.2;Agregar coco
+7;3;0.4;Agregar masa
+7;8;0.2;Picar tomate

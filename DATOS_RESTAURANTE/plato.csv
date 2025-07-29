@@ -1,0 +1,8 @@
+﻿id_plato;nombre_plato;descripcion;nivel_complejidad;foto;precio_venta;id_categoria;id_region
+1;Ajiaco;Sopa tipica andina con pollo y papas;3;https://example.com/ajiaco.jpg;25.00;1;1
+2;Bandeja paisa;Plato abundante con carne, chicharron, huevo;5;https://example.com/bandeja.jpg;30.00;2;1
+3;Sancocho llanero;Sopa con yuca, platano y carne;4;https://example.com/sancocholl.jpg;28.00;1;2
+4;Ceviche;Pescado marinado con limon;2;https://example.com/ceviche.jpg;22.00;6;3
+5;Arroz con coco;Arroz dulce con coco rallado;2;https://example.com/arrozcoco.jpg;18.00;5;3
+6;Encocado de pescado;Pescado en salsa de coco;4;https://example.com/encocado.jpg;32.00;6;4
+7;Tamales;Masa de maiz rellena;3;https://example.com/tamales.jpg;20.00;1;5

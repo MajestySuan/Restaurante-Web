@@ -1,0 +1,270 @@
+-- Conectar al servidor y crear la BD
+CREATE DATABASE restaurante;
+\c restaurante
+
+
+-- 1.1. CATEGORIA
+CREATE TABLE categoria (
+    id_categoria   SERIAL PRIMARY KEY,
+    nombre_categoria VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- 1.2. TURNO
+CREATE TABLE turno (
+    id_turno       SERIAL PRIMARY KEY,
+    nombre_turno   VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- 1.3. REGION
+CREATE TABLE region (
+    id_region      SERIAL PRIMARY KEY,
+    nombre_region  VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- 1.4. EMPLEADO
+CREATE TABLE empleado (
+    id_empleado    SERIAL PRIMARY KEY,
+    nombre_empleado VARCHAR(100) NOT NULL,
+    cargo          VARCHAR(100) NOT NULL
+);
+
+-- 1.5. INGREDIENTE
+CREATE TABLE ingrediente (
+    id_ingrediente SERIAL PRIMARY KEY,
+    nombre_ingrediente VARCHAR(100) NOT NULL UNIQUE,
+    unidad_medida  VARCHAR(50) NOT NULL
+);
+
+-- 1.6. STOCK
+CREATE TABLE stock (
+    id_stock       SERIAL PRIMARY KEY,
+    id_ingrediente INT NOT NULL REFERENCES ingrediente(id_ingrediente) ON DELETE RESTRICT,
+    cantidad       DECIMAL NOT NULL,
+    fecha_registro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 1.7. PLATO
+CREATE TABLE plato (
+    id_plato       SERIAL PRIMARY KEY,
+    nombre_plato   VARCHAR(100) NOT NULL,
+    descripcion    TEXT NOT NULL,
+    nivel_complejidad INT NOT NULL CHECK (nivel_complejidad BETWEEN 1 AND 5),
+    foto           VARCHAR(255),
+    precio_venta   DECIMAL(10,2) NOT NULL CHECK (precio_venta > 0),
+    id_categoria   INT NOT NULL REFERENCES categoria(id_categoria) ON DELETE RESTRICT,
+    id_region      INT NOT NULL REFERENCES region(id_region) ON DELETE RESTRICT,
+    UNIQUE (nombre_plato, id_region)
+);
+
+-- 1.8. PLATO_TURNO
+CREATE TABLE plato_turno (
+    id_plato       INT NOT NULL REFERENCES plato(id_plato) ON DELETE CASCADE,
+    id_turno       INT NOT NULL REFERENCES turno(id_turno) ON DELETE RESTRICT,
+    PRIMARY KEY (id_plato, id_turno)
+);
+
+-- 1.9. CARTA
+CREATE TABLE carta (
+    id_carta            SERIAL PRIMARY KEY,
+    nombre_carta        VARCHAR(100) NOT NULL,
+    fecha_inicio_vigencia DATE NOT NULL,
+    fecha_fin_vigencia  DATE NOT NULL,
+    activa              BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+-- 1.10. PLATO_CARTA
+CREATE TABLE plato_carta (
+    id_carta       INT NOT NULL REFERENCES carta(id_carta) ON DELETE CASCADE,
+    id_plato       INT NOT NULL REFERENCES plato(id_plato) ON DELETE RESTRICT,
+    PRIMARY KEY (id_carta, id_plato)
+);
+
+-- 1.11. RECETA
+CREATE TABLE receta (
+    id_plato       INT NOT NULL REFERENCES plato(id_plato) ON DELETE CASCADE,
+    id_ingrediente INT NOT NULL REFERENCES ingrediente(id_ingrediente) ON DELETE RESTRICT,
+    cantidad_requerida DECIMAL NOT NULL,
+    descripcion_preparacion TEXT,
+    PRIMARY KEY (id_plato, id_ingrediente)
+);
+
+-- 1.12. VENTA
+CREATE TABLE venta (
+    id_venta       SERIAL PRIMARY KEY,
+    fecha_venta    DATE NOT NULL,
+    cantidad       INT NOT NULL CHECK (cantidad > 0),
+    precio_u_v     DECIMAL(10,2) NOT NULL CHECK (precio_u_v > 0),
+    id_plato       INT NOT NULL REFERENCES plato(id_plato) ON DELETE RESTRICT,
+    id_turno       INT NOT NULL REFERENCES turno(id_turno) ON DELETE RESTRICT,
+    id_carta       INT NOT NULL REFERENCES carta(id_carta) ON DELETE RESTRICT,
+    id_empleado    INT NOT NULL REFERENCES empleado(id_empleado) ON DELETE RESTRICT
+);
+
+-- --------------------------------------------------
+-- 3. Vistas para reportes
+-- --------------------------------------------------
+
+-- 3.1. Ventas Mensuales
+CREATE OR REPLACE VIEW vista_ventas_mensuales AS
+SELECT
+  EXTRACT(YEAR FROM v.fecha_venta)::INT   AS año,
+  EXTRACT(MONTH FROM v.fecha_venta)::INT  AS mes,
+  p.nombre_plato                         AS plato,
+  r.nombre_region                        AS región,
+  t.nombre_turno                         AS turno,
+  SUM(v.cantidad)                        AS unidades_vendidas,
+  SUM(v.cantidad * v.precio_u_v)         AS ingresos_totales
+FROM venta v
+JOIN plato p ON v.id_plato = p.id_plato
+JOIN region r ON p.id_region = r.id_region
+JOIN turno t  ON v.id_turno = t.id_turno
+GROUP BY año, mes, plato, región, turno
+ORDER BY año, mes, región, turno, plato;
+
+-- 3.2. Ventas Anuales
+CREATE OR REPLACE VIEW vista_ventas_anuales AS
+SELECT
+  EXTRACT(YEAR FROM v.fecha_venta)::INT   AS año,
+  p.nombre_plato                         AS plato,
+  r.nombre_region                        AS región,
+  t.nombre_turno                         AS turno,
+  SUM(v.cantidad)                        AS unidades_vendidas,
+  SUM(v.cantidad * v.precio_u_v)         AS ingresos_totales
+FROM venta v
+JOIN plato p ON v.id_plato = p.id_plato
+JOIN region r ON p.id_region = r.id_region
+JOIN turno t  ON v.id_turno = t.id_turno
+GROUP BY año, plato, región, turno
+ORDER BY año, región, turno, plato;
+
+-- 3.3. Platos por Región y Turno (Mensual)
+CREATE OR REPLACE VIEW vista_platos_region_turno_mensual AS
+SELECT
+  EXTRACT(YEAR FROM v.fecha_venta)::INT   AS año,
+  EXTRACT(MONTH FROM v.fecha_venta)::INT  AS mes,
+  r.nombre_region                        AS región,
+  t.nombre_turno                         AS turno,
+  SUM(v.cantidad)                        AS total_platos
+FROM venta v
+JOIN plato p ON v.id_plato = p.id_plato
+JOIN region r ON p.id_region = r.id_region
+JOIN turno t  ON v.id_turno = t.id_turno
+GROUP BY año, mes, región, turno
+ORDER BY año, mes, región, turno;
+
+-- 3.4. Platos por Región y Turno (Anual)
+CREATE OR REPLACE VIEW vista_platos_region_turno_anual AS
+SELECT
+  EXTRACT(YEAR FROM v.fecha_venta)::INT   AS año,
+  r.nombre_region                        AS región,
+  t.nombre_turno                         AS turno,
+  SUM(v.cantidad)                        AS total_platos
+FROM venta v
+JOIN plato p ON v.id_plato = p.id_plato
+JOIN region r ON p.id_region = r.id_region
+JOIN turno t  ON v.id_turno = t.id_turno
+GROUP BY año, región, turno
+ORDER BY año, región, turno;
+
+-- 3.5. Platos por Carta
+CREATE OR REPLACE VIEW vista_platos_por_carta AS
+SELECT
+  c.nombre_carta,
+  c.fecha_inicio_vigencia,
+  c.fecha_fin_vigencia,
+  p.nombre_plato,
+  p.descripcion,
+  p.precio_venta
+FROM carta c
+JOIN plato_carta pc ON c.id_carta = pc.id_carta
+JOIN plato p       ON pc.id_plato = p.id_plato
+ORDER BY c.fecha_inicio_vigencia, c.nombre_carta, p.nombre_plato;
+
+-- --------------------------------------------------
+-- 4. Funciones y Triggers
+-- --------------------------------------------------
+
+-- 4.1. Función para validar solapamiento de cartas
+CREATE OR REPLACE FUNCTION fn_validar_periodo_carta()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.activa THEN
+    IF EXISTS (
+      SELECT 1 FROM carta
+      WHERE activa = TRUE
+        AND id_carta <> COALESCE(NEW.id_carta, 0)
+        AND daterange(fecha_inicio_vigencia, fecha_fin_vigencia, '[]')
+            && daterange(NEW.fecha_inicio_vigencia, NEW.fecha_fin_vigencia, '[]')
+    ) THEN
+      RAISE EXCEPTION 'Periodo de vigencia se solapa con otra carta activa';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tg_validar_carta_periodo
+  BEFORE INSERT OR UPDATE ON carta
+  FOR EACH ROW EXECUTE FUNCTION fn_validar_periodo_carta();
+
+-- 4.2. Función y trigger para validar y actualizar stock al insertar venta
+CREATE OR REPLACE FUNCTION fn_actualizar_stock_venta()
+RETURNS TRIGGER AS $$
+DECLARE
+  rec_receta RECORD;
+  stock_actual NUMERIC;
+BEGIN
+  -- Validar stock suficiente
+  FOR rec_receta IN
+    SELECT id_ingrediente, cantidad_requerida
+    FROM receta
+    WHERE id_plato = NEW.id_plato
+  LOOP
+    SELECT cantidad
+      INTO stock_actual
+    FROM stock
+    WHERE id_ingrediente = rec_receta.id_ingrediente
+    ORDER BY fecha_registro DESC
+    LIMIT 1;
+    IF stock_actual IS NULL OR stock_actual < (rec_receta.cantidad_requerida * NEW.cantidad) THEN
+      RAISE EXCEPTION 'Stock insuficiente para el ingrediente %', rec_receta.id_ingrediente;
+    END IF;
+  END LOOP;
+
+  -- Insertar movimientos negativos en stock
+  FOR rec_receta IN
+    SELECT id_ingrediente, cantidad_requerida
+    FROM receta
+    WHERE id_plato = NEW.id_plato
+  LOOP
+    INSERT INTO stock (id_ingrediente, cantidad, fecha_registro)
+    VALUES (
+      rec_receta.id_ingrediente,
+      -(rec_receta.cantidad_requerida * NEW.cantidad),
+      CURRENT_TIMESTAMP
+    );
+  END LOOP;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tg_venta_actualiza_stock
+  BEFORE INSERT ON venta
+  FOR EACH ROW EXECUTE FUNCTION fn_actualizar_stock_venta();
+
+
+CREATE OR REPLACE VIEW vista_stock_bajo AS  
+SELECT  
+i.nombre_ingrediente,  
+i.unidad_medida,  
+COALESCE(SUM(s.cantidad),0) AS stock_actual  
+FROM ingrediente i  
+LEFT JOIN stock s ON i.id_ingrediente = s.id_ingrediente  
+GROUP BY i.nombre_ingrediente, i.unidad_medida  
+HAVING COALESCE(SUM(s.cantidad),0) < 10  
+ORDER BY stock_actual ASC; 
+
+---------
+
+SELECT setval( pg_get_serial_sequence('stock','id_stock'), (SELECT COALESCE(MAX(id_stock),0) FROM stock) ); 
